@@ -1,6 +1,6 @@
 
 
-import { createRxDatabase, RxDatabase, RxCollection } from "rxdb";
+import { createRxDatabase, RxDatabase } from "rxdb";
 import { getRxStorageDexie } from "rxdb/plugins/storage-dexie";
 import type { DatabaseCollections } from "../types/comment";
 
