@@ -9,8 +9,17 @@ const CommentComponent = ({
   onReply,
   removeComment,
 }: CommentProps) => {
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleDateString("de-DE", {
+      day: "numeric",
+      month: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
   return (
-    <div className="mb-2">
+    <div className="mb-2" data-testid={`comment-container-${comment.id}`}>
       <article className="p-6 text-base bg-white rounded-lg dark:bg-gray-900 border-2">
         <footer className="flex flex-col">
           <time
@@ -18,9 +27,14 @@ const CommentComponent = ({
             dateTime={new Date(comment.createdAt).toLocaleString()}
             title={new Date(comment.createdAt).toLocaleString()}
           >
-            {new Date(comment.createdAt).toLocaleString()}
+            {formatDate(comment.createdAt)}
           </time>
-          <p className="text-gray-500 dark:text-gray-400">{comment.content}</p>
+          <p
+            className="text-gray-500 dark:text-gray-400"
+            data-testid={`comment-content-${comment.id}`}
+          >
+            {comment.content}
+          </p>
           <CommentButtons
             comment={comment}
             onReply={onReply}
@@ -55,15 +69,16 @@ export const Comments = () => {
   };
 
   if (isLoading) {
-    return <div>Loading comments...</div>;
+    return <div>Laden...</div>;
   }
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="mb-8">
+      <form role="form" onSubmit={handleSubmit} className="mb-8">
         <textarea
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
+          data-testid="comment-input"
           className="w-full p-2 border rounded text-black"
           placeholder={
             replyTo
@@ -74,6 +89,7 @@ export const Comments = () => {
         <div className="flex gap-2 mt-2">
           <button
             type="submit"
+            data-testid="submit-button"
             className="inline-flex items-center py-2.5 px-4 text-xs font-medium text-center text-white bg-primary-700 rounded-lg focus:ring-4 focus:ring-primary-200 dark:focus:ring-primary-900 hover:bg-primary-800 cursor-pointer"
             disabled={!newComment.trim()}
           >
@@ -83,6 +99,7 @@ export const Comments = () => {
             <button
               type="button"
               onClick={() => setReplyTo(null)}
+              data-testid="cancel-button"
               className="inline-flex items-center py-2.5 px-4 text-xs font-medium text-center text-white bg-primary-700 rounded-lg focus:ring-4 focus:ring-primary-200 dark:focus:ring-primary-900 hover:bg-primary-800 cursor-pointer"
             >
               Abbrechen
@@ -110,6 +127,7 @@ const CommentButtons = ({ comment, onReply, removeComment }: CommentProps) => {
     <div className="flex gap-4 mt-6">
       <button
         type="button"
+        data-testid={`reply-button-${comment.id}`}
         className="flex items-center text-sm text-gray-500 hover:underline dark:text-gray-400 font-medium"
         onClick={() => onReply(comment.id)}
       >
@@ -132,6 +150,7 @@ const CommentButtons = ({ comment, onReply, removeComment }: CommentProps) => {
       </button>
       <button
         type="button"
+        data-testid={`delete-button-${comment.id}`}
         className="flex items-center text-sm text-gray-500 hover:underline dark:text-gray-400 font-medium"
         onClick={() => removeComment(comment.id)}
       >
