@@ -15,7 +15,7 @@ export const useComments = (): UseCommentsReturn => {
       const db = await getDatabase();
       setCollection(db.comments);
       setIsLoading(false);
-    }
+    };
     init();
   }, []);
 
@@ -23,38 +23,41 @@ export const useComments = (): UseCommentsReturn => {
     if (!collection) return;
 
     const sub = collection.find().$.subscribe((docs) => {
-      const commentMap = new Map<string, Comment>();
+      const commentMap = new Map<string, Comment>(
+        docs.map((doc) => {
+          const comment: Comment = {
+            ...doc.toJSON(),
+            replies: [],
+          };
+          return [comment.id, comment];
+        })
+      );
 
-      docs.forEach((doc) => {
-        const commentData = doc.toJSON();
-        commentMap.set(commentData.id, {
-          ...commentData,
-          replies: [],
-        });
-      });
-
-      const rootComments: Comment[] = [];
-
-      commentMap.forEach((comment) => {
-        let parentComment = null;
-        !comment.parentId
-          ? rootComments.push(comment)
-          : (parentComment = commentMap.get(comment.parentId));
-        parentComment && parentComment.replies?.push(comment);
-      });
-
-      const sortComments = (commentsToSort: Comment[]) => {
-        commentsToSort.sort((a, b) => a.createdAt - b.createdAt);
-        commentsToSort.forEach((comment) => {
-          if (comment.replies && comment.replies.length > 0) {
-            sortComments(comment.replies);
+      const rootComments = Array.from(commentMap.values()).reduce<Comment[]>(
+        (acc, comment) => {
+          if (comment.parentId) {
+            const parent = commentMap.get(comment.parentId);
+            if (parent) {
+              if (!parent.replies) parent.replies = [];
+              parent.replies.push(comment);
+            }
+          } else {
+            acc.push(comment);
           }
-        });
-        return commentsToSort;
+          return acc;
+        },
+        []
+      );
+
+      const sortRecursively = (items: Comment[]): Comment[] => {
+        items.sort((a, b) => a.createdAt - b.createdAt);
+        items.forEach(
+          (item) => item.replies?.length && sortRecursively(item.replies)
+        );
+        return items;
       };
 
-      const sortedComments = sortComments(rootComments);
-      setComments(sortedComments);
+      setComments(sortRecursively(rootComments));
     });
 
     return () => sub.unsubscribe();
@@ -65,7 +68,6 @@ export const useComments = (): UseCommentsReturn => {
     parentId: string | null = null
   ) => {
     if (!collection) return;
-
     await collection.insert({
       id: `comment_${Date.now()}`,
       content,
@@ -74,49 +76,26 @@ export const useComments = (): UseCommentsReturn => {
     });
   };
 
-    const removeComment = async (commentId: string) => {
-      if (!collection) return;
+  const removeComment = async (commentId: string) => {
+    if (!collection) return;
 
-      try {
-        const getAllReplyIds = async (parentId: string): Promise<string[]> => {
-          const replies = await collection
-            .find({
-              selector: {
-                parentId,
-              },
-            })
-            .exec();
-
-          const replyIds = replies.map((reply) => reply.id);
-
-          const nestedReplyIds = await Promise.all(
-            replyIds.map((replyId) => getAllReplyIds(replyId))
-          );
-
-          return [...replyIds, ...nestedReplyIds.flat()];
-        };
-
-        const replyIds = await getAllReplyIds(commentId);
-
-        const idsToRemove = [commentId, ...replyIds];
-
-        await collection
-          .find({
-            selector: {
-              id: {
-                $in: idsToRemove,
-              },
-            },
-          })
-          .remove();
-      } catch (error) {
-        console.error("Error removing comment:", error);
-        throw error;
-      }
+    const getAllReplyIds = async (parentId: string): Promise<string[]> => {
+      const replies = await collection.find({ selector: { parentId } }).exec();
+      const childIds = await Promise.all(
+        replies.map((r) => getAllReplyIds(r.id))
+      );
+      return [...replies.map((r) => r.id), ...childIds.flat()];
     };
 
+    const idsToRemove = [commentId, ...(await getAllReplyIds(commentId))];
+    await collection
+      .find({
+        selector: { id: { $in: idsToRemove } },
+      })
+      .remove();
+  };
 
-  const clearComments = async () => {
+  const clearComments = async (): Promise<void> => {
     if (!collection) return;
     await collection.find().remove();
   };

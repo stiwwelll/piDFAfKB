@@ -1,18 +1,17 @@
 import type { RxCollection } from "rxdb";
 
-export interface Comment {
+interface CommentBase {
   id: string;
   content: string;
   parentId: string | null;
   createdAt: number;
+}
+
+export interface Comment extends CommentBase {
   replies?: Comment[];
 }
 
-export interface RxDBComment {
-  id: string;
-  content: string;
-  parentId: string | null;
-  createdAt: number;
+export interface RxDBComment extends CommentBase {
   toJSON: () => Comment;
 }
 
